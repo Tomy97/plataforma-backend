@@ -1,0 +1,65 @@
+name: Build, Lint, Test & Deploy Backend
+
+on:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+  pull_request:
+    branches:
+      - master
+      - main
+      - develop
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Checkout del código
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2) Instalar .NET SDK
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      # 3) (Opcional) Instalar dotnet-format para linting
+      - name: Install dotnet-format
+        run: dotnet tool install -g dotnet-format
+
+      # 4) Restore de paquetes NuGet
+      - name: Restore dependencies
+        run: dotnet restore
+
+      # 5) Lint / Format check
+      - name: Lint (dotnet format)
+        run: dotnet format --verify-no-changes
+
+      # 6) Compilar
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      # 7) Ejecutar tests
+      - name: Test
+        run: dotnet test --configuration Release --no-build
+
+      # 8) Publicar artefactos para deploy
+      - name: Publish
+        run: dotnet publish --configuration Release --output publish
+
+      # 9) Login en Azure usando Service Principal
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # 10) Desplegar en Azure App Service
+      - name: Deploy to Azure WebApp
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'plataforma-backend-service'
+          package: publish
